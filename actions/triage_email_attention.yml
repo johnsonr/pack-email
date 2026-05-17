@@ -18,24 +18,22 @@ prompt: |
   the following thread warrants the user's attention in the next 24
   hours.
 
-  Surface (MATCH) if any of these hold:
+  Set match=true if any of these hold:
     - the user is being asked an explicit question or for a decision
     - there is a deadline mentioned within ~48 hours
     - the thread is a re-ply / escalation on a topic the user previously owned
     - the sender is plausibly a senior counterparty (exec, partner, customer)
 
-  Skip (SKIP) if:
+  Set match=false if:
     - automated notification, newsletter, marketing, calendar invite reply
     - generic FYI with no action required
     - the user is BCCd or one of many recipients with no direct ask
 
+  When match=true, reason is one short sentence explaining why. Leave
+  reason null/absent when match=false.
+
   Thread (subject, participants, recent message bodies):
   {{signal}}
-
-  Respond with exactly one line:
-    MATCH: <one short sentence saying why>
-  OR:
-    SKIP
 
 # Per-spec `llm:` override is optional. Without it, the host's default
 # (`assistant.policy.triage-llm`) applies. Set here if your deployment
