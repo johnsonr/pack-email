@@ -11,28 +11,28 @@
 - name: email.thread
   description: An email thread surfaced when something in it warrants attention. Provider-agnostic; the `provider` field distinguishes which inbox emitted it.
   properties:
-    - name: id
+    id:
       type: string
       description: Unique signal id — account-prefixed thread id (`accountId:threadId`)
-    - name: subject
+    subject:
       type: string
       description: Thread subject line
-    - name: provider
+    provider:
       type: string
       description: "Which mail provider produced this thread (`gmail`, future: `exchange`, `imap`, …)"
-    - name: source.kind
+    source.kind:
       type: string
       description: Always `email` — the originating system at the host level
-    - name: source.url
+    source.url:
       type: string
       description: Deep-link to the thread in the provider's web UI
-    - name: participants
+    participants:
       type: string
       cardinality: LIST
       description: Email addresses on the thread (To, Cc, From across all messages, de-duped)
-    - name: last_sender
+    last_sender:
       type: string
       description: From-address of the most recent message; null on empty thread
-    - name: message_count
+    message_count:
       type: integer
       description: Total message count in the thread
