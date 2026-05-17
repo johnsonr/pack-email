@@ -1,56 +1,52 @@
-# LLM-judged escalation. Runs only when no deterministic policy
-# matched the signal — the GOAP-aligned planner picks deterministic
-# rules first by cost (~0.01) and falls through to this LLM call
-# (~0.5) when none of them produced an AttentionCandidate.
+# LLM-judged escalation for email threads. Vanilla framework
+# PromptedActionSpec — `stepType: action` — producing an
+# `AttentionVerdict`. The host's generic
+# `WrapVerdictAsAttentionCandidate` action lifts (verdict, signal)
+# → AttentionCandidate, completing the catchup goal.
 #
-# Provider-agnostic: any inbox whose producer emits signals satisfying
-# `email.thread` (Gmail today, future: Exchange, IMAP, …) is judged by
-# this same prompt.
+# `nullable: true` is the SKIP semantic: the LLM is free to return
+# null to indicate "this thread doesn't warrant attention". The
+# planner sees no AttentionVerdict produced, doesn't pick the wrap
+# action, the per-signal AgentProcess terminates with no candidate.
+#
+# Cost is well above any deterministic policy (~0.01) on the same
+# signal type. When both fire, UtilityAI picks the cheap policy
+# first; if it produces a candidate the goal is satisfied and this
+# LLM call never runs. Pure GOAP composition.
 
-stepType: triage
+stepType: action
 name: triage_email_attention
-description: Surface email threads the LLM judges worth the user's attention
+description: Judge whether an email thread warrants the user's attention
 
-on: email.thread
+inputTypeNames:
+  - email.thread
+
+outputTypeName: AttentionVerdict
+nullable: true
 
 prompt: |
   You are filtering email for {{user}}'s morning brief. Decide whether
   the following thread warrants the user's attention in the next 24
   hours.
 
-  Set match=true if any of these hold:
+  Return a verdict if any of these hold:
     - the user is being asked an explicit question or for a decision
     - there is a deadline mentioned within ~48 hours
     - the thread is a re-ply / escalation on a topic the user previously owned
     - the sender is plausibly a senior counterparty (exec, partner, customer)
 
-  Set match=false if:
+  Return null if:
     - automated notification, newsletter, marketing, calendar invite reply
     - generic FYI with no action required
     - the user is BCCd or one of many recipients with no direct ask
 
-  When match=true, reason is one short sentence explaining why. Leave
-  reason null/absent when match=false.
+  When returning a verdict, the `reason` field is one short sentence
+  explaining why. `confidence` is your calibrated estimate in [0,1].
+  `tier` defaults to TIMELY; promote to URGENT only if there's a
+  same-day deadline or named-blocker.
 
   Thread (subject, participants, recent message bodies):
-  {{signal}}
+  {{emailThread}}
 
-# Per-spec `llm:` override is optional. Without it, the host's default
-# (`assistant.policy.triage-llm`) applies. Set here if your deployment
-# wants a fixed cost/quality preference for this judgment.
-# llm:
-#   model: gpt-4.1-nano
-#   temperature: 0.0
-
-surface:
-  tier: TIMELY
-  headline: "{subject}"
-  why: "{reason}"
-  url: "{source.url}"
-
-# Triage costs more than any deterministic policy (real LLM call), so
-# on signals where a cheap policy can decide, the policy wins the
-# UtilityAI race naturally and this triage doesn't run.
-utility:
-  cost: 0.5
-  value: 1.0
+cost: 0.5
+value: 1.0
