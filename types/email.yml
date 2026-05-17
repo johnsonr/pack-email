@@ -1,0 +1,38 @@
+# The universal email signal type. Provider-agnostic — any inbox
+# integration (in-tree Gmail today, future pack-exchange / pack-imap)
+# whose signals carry `typeName: email.thread` satisfies it.
+#
+# If gmail-specific or exchange-specific rules ever earn their weight,
+# declare `gmail.thread` / `exchange.thread` with `parents: [email.thread]`
+# and the framework's `domainTypeMatches` walks the parent chain — a
+# `gmail.thread` instance would satisfy both `on: email.thread` and
+# `on: gmail.thread`.
+
+- name: email.thread
+  description: An email thread surfaced when something in it warrants attention. Provider-agnostic; the `provider` field distinguishes which inbox emitted it.
+  ownProperties:
+    - name: id
+      type: string
+      description: Unique signal id — account-prefixed thread id (`accountId:threadId`)
+    - name: subject
+      type: string
+      description: Thread subject line
+    - name: provider
+      type: string
+      description: "Which mail provider produced this thread (`gmail`, future: `exchange`, `imap`, …)"
+    - name: source.kind
+      type: string
+      description: Always `email` — the originating system at the host level
+    - name: source.url
+      type: string
+      description: Deep-link to the thread in the provider's web UI
+    - name: participants
+      type: string
+      cardinality: LIST
+      description: Email addresses on the thread (To, Cc, From across all messages, de-duped)
+    - name: last_sender
+      type: string
+      description: From-address of the most recent message; null on empty thread
+    - name: message_count
+      type: integer
+      description: Total message count in the thread

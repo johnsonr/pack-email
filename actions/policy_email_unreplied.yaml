@@ -1,0 +1,29 @@
+# Deterministic fast-path for unreplied threads. Predicate is cheap
+# (an AST walk over the signal's fields, no LLM call). When this fires
+# the per-signal AgentProcess writes an AttentionCandidate and the goal
+# is satisfied — the LLM triage (`triage_email_attention.yaml`) doesn't
+# get picked, saving its cost. When the predicate doesn't match, the
+# planner escalates to the LLM triage automatically.
+#
+# Provider-agnostic: fires for Gmail, Exchange, IMAP — any inbox whose
+# producer emits signals satisfying `email.thread`.
+
+stepType: policy
+name: email_unreplied
+description: A thread you're a participant in has activity from someone else, ≥ 24h ago
+
+on: email.thread
+
+whenExpr: "$self in participants and last_sender != $self and age >= 24h"
+
+surface:
+  tier: TIMELY
+  headline: "{subject}"
+  why: "Last reply from {last_sender}"
+  url: "{source.url}"
+
+# UtilityAI economics. Cost ~0 (AST walk); value 1.0. Net utility 0.99,
+# which beats the LLM triage's 0.5 — the planner picks this first.
+utility:
+  cost: 0.01
+  value: 1.0

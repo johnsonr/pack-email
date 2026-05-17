@@ -1,0 +1,58 @@
+# LLM-judged escalation. Runs only when no deterministic policy
+# matched the signal — the GOAP-aligned planner picks deterministic
+# rules first by cost (~0.01) and falls through to this LLM call
+# (~0.5) when none of them produced an AttentionCandidate.
+#
+# Provider-agnostic: any inbox whose producer emits signals satisfying
+# `email.thread` (Gmail today, future: Exchange, IMAP, …) is judged by
+# this same prompt.
+
+stepType: triage
+name: triage_email_attention
+description: Surface email threads the LLM judges worth the user's attention
+
+on: email.thread
+
+prompt: |
+  You are filtering email for {{user}}'s morning brief. Decide whether
+  the following thread warrants the user's attention in the next 24
+  hours.
+
+  Surface (MATCH) if any of these hold:
+    - the user is being asked an explicit question or for a decision
+    - there is a deadline mentioned within ~48 hours
+    - the thread is a re-ply / escalation on a topic the user previously owned
+    - the sender is plausibly a senior counterparty (exec, partner, customer)
+
+  Skip (SKIP) if:
+    - automated notification, newsletter, marketing, calendar invite reply
+    - generic FYI with no action required
+    - the user is BCCd or one of many recipients with no direct ask
+
+  Thread (subject, participants, recent message bodies):
+  {{signal}}
+
+  Respond with exactly one line:
+    MATCH: <one short sentence saying why>
+  OR:
+    SKIP
+
+# Per-spec `llm:` override is optional. Without it, the host's default
+# (`assistant.policy.triage-llm`) applies. Set here if your deployment
+# wants a fixed cost/quality preference for this judgment.
+# llm:
+#   model: gpt-4.1-nano
+#   temperature: 0.0
+
+surface:
+  tier: TIMELY
+  headline: "{subject}"
+  why: "{reason}"
+  url: "{source.url}"
+
+# Triage costs more than any deterministic policy (real LLM call), so
+# on signals where a cheap policy can decide, the policy wins the
+# UtilityAI race naturally and this triage doesn't run.
+utility:
+  cost: 0.5
+  value: 1.0
