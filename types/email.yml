@@ -10,7 +10,7 @@
 
 - name: email.thread
   description: An email thread surfaced when something in it warrants attention. Provider-agnostic; the `provider` field distinguishes which inbox emitted it.
-  ownProperties:
+  properties:
     - name: id
       type: string
       description: Unique signal id — account-prefixed thread id (`accountId:threadId`)
