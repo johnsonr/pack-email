@@ -1,0 +1,59 @@
+# Generic per-person research action. Vanilla PromptedActionSpec — the
+# unit of research is the person, not the use case. Whether this person
+# comes up as an email sender, a meeting attendee, or a github mention,
+# the SAME action produces the SAME shape (`PersonContext`). Downstream
+# actions consume the context: email triage sees who sent the message,
+# meeting-prep sees attendee context, etc.
+#
+# Living here in pack-email is provisional — the action is genuinely
+# cross-pack (its tools span gmail, github, hubspot, etc.). Once a
+# `pack-person` sibling exists, this moves there.
+#
+# `nullable: true` — research can return null when there's nothing
+# usable to say. Consumers degrade gracefully (triage falls back to
+# the bare email signal without context).
+
+stepType: action
+name: research_person
+description: Build a context profile for a person from across the user's connected systems
+
+inputTypeNames:
+  - Person
+
+outputTypeName: PersonContext
+nullable: true
+
+# Tool surface — best-effort over whatever the user has installed. The
+# framework's tool resolver matches groups against the user's
+# available tool registry; missing groups produce no error, the LLM
+# just has fewer tools to call.
+toolGroups:
+  - gmail
+  - github
+  - hubspot
+
+prompt: |
+  You are researching {{person.displayName}} ({{person.email}}) for
+  {{user}}. Use the available tools to find what {{user}} should know
+  about them. Be concise — short noun phrases for topics, single short
+  sentences for open items.
+
+  Produce a `PersonContext` with whatever you can determine. Skip
+  fields you have no signal for. Return null if the available tools
+  surface nothing about this person at all.
+
+  Look for, in rough priority:
+    - role and organization (job title, company)
+    - relationship to {{user}}: are they a customer, internal colleague,
+      vendor, partner, or unknown?
+    - 3-5 most recent topics this person has raised with or mentioned
+      to {{user}}
+    - any open commitments or pending asks between them
+    - rough sentiment of recent interactions
+
+# Higher cost than email triage — multiple tool calls likely. Value
+# is downstream demand: triage_email_attention and (later)
+# meeting_prep consume this. UtilityAI picks it when something else
+# needs PersonContext as a precondition.
+cost: 1.5
+value: 0.8

@@ -4,15 +4,17 @@
 # `WrapVerdictAsAttentionCandidate` action lifts (verdict, signal)
 # → AttentionCandidate, completing the catchup goal.
 #
+# **Cross-stream input.** Takes both the email thread AND the
+# `PersonContext` for the sender. The catchup orchestrator binds
+# both: thread + a `Person` derived from the sender. The planner
+# then chains `research_person → PersonContext → this action`
+# automatically. When research returns null (nothing useful found),
+# the planner falls back to the bare thread.
+#
 # `nullable: true` is the SKIP semantic: the LLM is free to return
 # null to indicate "this thread doesn't warrant attention". The
 # planner sees no AttentionVerdict produced, doesn't pick the wrap
 # action, the per-signal AgentProcess terminates with no candidate.
-#
-# Cost is well above any deterministic policy (~0.01) on the same
-# signal type. When both fire, UtilityAI picks the cheap policy
-# first; if it produces a candidate the goal is satisfied and this
-# LLM call never runs. Pure GOAP composition.
 
 stepType: action
 name: triage_email_attention
@@ -20,6 +22,7 @@ description: Judge whether an email thread warrants the user's attention
 
 inputTypeNames:
   - email.thread
+  - PersonContext
 
 outputTypeName: AttentionVerdict
 nullable: true
@@ -29,21 +32,27 @@ prompt: |
   the following thread warrants the user's attention in the next 24
   hours.
 
+  Sender context (what we know about {{personContext.person.displayName}}):
+  {{personContext}}
+
   Return a verdict if any of these hold:
     - the user is being asked an explicit question or for a decision
     - there is a deadline mentioned within ~48 hours
     - the thread is a re-ply / escalation on a topic the user previously owned
-    - the sender is plausibly a senior counterparty (exec, partner, customer)
+    - the sender is a senior counterparty (exec, customer, partner) — the
+      context above will tell you their role and relationship
+    - the thread relates to an open item the user has with this person
 
   Return null if:
     - automated notification, newsletter, marketing, calendar invite reply
     - generic FYI with no action required
     - the user is BCCd or one of many recipients with no direct ask
 
-  When returning a verdict, the `reason` field is one short sentence
-  explaining why. `confidence` is your calibrated estimate in [0,1].
-  `tier` defaults to TIMELY; promote to URGENT only if there's a
-  same-day deadline or named-blocker.
+  When returning a verdict, `reason` is one short sentence explaining
+  why — reference the sender context when it sharpens the judgment.
+  `confidence` is your calibrated estimate in [0,1]. `tier` defaults
+  to TIMELY; promote to URGENT only if there's a same-day deadline or
+  a named blocker.
 
   Thread (subject, participants, recent message bodies):
   {{emailThread}}
