@@ -1,0 +1,46 @@
+# Fallback triage: same shape as `triage_email_attention` but without
+# the PersonContext input. The planner picks this when research_person
+# returned null (sender context unavailable) and the contextual triage
+# can't fire.
+#
+# value: 0.8 — lower than the contextual triage's 1.0, so UtilityAI
+# prefers the contextual variant whenever PersonContext is on the
+# blackboard. This action picks only when it isn't.
+
+stepType: action
+name: triage_email_attention_no_context
+description: Judge whether an email thread warrants attention (without sender context)
+
+inputTypeNames:
+  - email.thread
+
+outputTypeName: AttentionVerdict
+nullable: true
+
+prompt: |
+  You are filtering email for {{user}}'s morning brief. Decide whether
+  the following thread warrants the user's attention in the next 24
+  hours. You don't have any researched context for the sender — judge
+  from the thread alone.
+
+  Return a verdict if any of these hold:
+    - the user is being asked an explicit question or for a decision
+    - there is a deadline mentioned within ~48 hours
+    - the thread is a re-ply / escalation on a topic the user previously owned
+    - the sender's email domain or signature suggests an exec, customer, or partner
+
+  Return null if:
+    - automated notification, newsletter, marketing, calendar invite reply
+    - generic FYI with no action required
+    - the user is BCCd or one of many recipients with no direct ask
+
+  When returning a verdict, `reason` is one short sentence explaining
+  why. `confidence` is your calibrated estimate in [0,1]. `tier`
+  defaults to TIMELY; promote to URGENT only if there's a same-day
+  deadline or a named blocker.
+
+  Thread (subject, participants, recent message bodies):
+  {{emailThread}}
+
+cost: 0.5
+value: 0.8

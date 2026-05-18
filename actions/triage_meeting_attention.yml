@@ -1,0 +1,60 @@
+# TODO: move to pack-calendar/actions/ when that pack exists. Lives
+# here today because no calendar-focused pack repo exists yet.
+# pack-google is TypeScript-shaped and doesn't ship attention rules.
+#
+# LLM-judged triage for upcoming calendar meetings. Vanilla
+# PromptedActionSpec producing AttentionVerdict; the host's wrap
+# action lifts (verdict, signal) → AttentionCandidate, completing the
+# catchup goal.
+#
+# Catchup's lookahead window (post-removal of the
+# `occurredAt < now` filter) means future meetings flow through this
+# triage. The judgment is "should the user prepare / acknowledge /
+# decline this meeting" — surfaces commitments the user has missed.
+
+stepType: action
+name: triage_meeting_attention
+description: Judge whether an upcoming meeting warrants the user's attention
+
+inputTypeNames:
+  - calendar.meeting
+
+outputTypeName: AttentionVerdict
+nullable: true
+
+prompt: |
+  You are filtering calendar events for {{user}}'s morning brief.
+  Decide whether the following meeting warrants the user's attention
+  in the next 24 hours.
+
+  Return a verdict if any of these hold:
+    - the user hasn't responded (`my_response` is `NEEDS_ACTION` or `TENTATIVE`)
+      and the meeting starts within ~24 hours
+    - external attendees and the meeting starts within ~24 hours
+      (preparation is likely needed)
+    - the meeting topic suggests a decision point (review, approval,
+      hiring, contract, performance, escalation)
+    - the user is the organizer and the meeting starts within ~4 hours
+      (last-chance prep)
+
+  Return null if:
+    - routine internal sync / standup / 1:1 with no apparent prep need
+    - the user has already responded `ACCEPTED` and the topic is
+      operational rather than decision-bearing
+    - the event is recurring and indistinguishable from prior instances
+
+  When returning a verdict, `reason` is one short sentence —
+  reference the topic and any specific prep need. `confidence` is
+  your calibrated estimate in [0,1]. `tier` defaults to TIMELY;
+  promote to INTERRUPTIVE only if the meeting is within 60 minutes
+  and the user clearly hasn't prepared.
+
+  Meeting:
+  {{calendarMeeting}}
+
+# Cost ~0.4 — single LLM call, no tool fan-out (yet). Value 1.0.
+# Future enhancement: chain through `research_person` for each
+# external attendee and feed a `meeting_prep` action with all the
+# PersonContexts gathered.
+cost: 0.4
+value: 1.0
