@@ -12,15 +12,10 @@ stepType: policy
 name: email_unreplied
 description: A thread you're a participant in has activity from someone else, ≥ 24h ago
 
-on: email.thread
+inputTypeNames:
+  - email.thread
 
 whenExpr: "$self in participants and last_sender != $self and age >= 24h"
-
-surface:
-  tier: TIMELY
-  headline: "{subject}"
-  why: "Last reply from {last_sender}"
-  url: "{source.url}"
 
 # Top-level cost/value, matching the framework's PromptedActionSpec
 # convention. Cost ~0 (AST walk); value 1.0. Net utility 0.99 beats
