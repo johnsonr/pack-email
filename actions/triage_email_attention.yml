@@ -24,38 +24,60 @@ inputTypeNames:
   - email.thread
   - PersonContext
 
-outputTypeName: AttentionVerdict
+outputTypeName: com.embabel.assistant.consequence.AttentionVerdict
 nullable: true
+
+# Don't even run on emails that the initial-triage GOAP action
+# (`triage.email_screening`) has dismissed as spam / calendar
+# artifact / bulk-sender noise. The screening action writes
+# `emailScreened:Boolean=TRUE` only on pass; without it set, this
+# precondition fails and the planner moves on / abandons cleanly.
+pre:
+  - "emailScreened:java.lang.Boolean"
 
 prompt: |
   You are filtering email for {{user}}'s morning brief. Decide whether
   the following thread warrants the user's attention in the next 24
   hours.
 
+  {% if personality %}
+  Your voice / personality:
+  {{personality}}
+
+  When you write the `reason` field, write it IN THIS VOICE. The
+  judgment criteria below stay the same; the voice changes how you
+  say things, not what you decide.
+  {% endif %}
+
   Sender context (what we know about {{personContext.person.displayName}}):
   {{personContext}}
 
-  Return a verdict if any of these hold:
+  ALWAYS return an AttentionVerdict — never return null, never omit fields.
+  The host filters verdicts with confidence below 0.35 server-side, so use
+  confidence as the skip signal: low for "no", high for "yes".
+
+  HIGH confidence (≥ 0.6) — this thread warrants attention if ANY hold:
     - the user is being asked an explicit question or for a decision
     - there is a deadline mentioned within ~48 hours
     - the thread is a re-ply / escalation on a topic the user previously owned
-    - the sender is a senior counterparty (exec, customer, partner) — the
-      context above will tell you their role and relationship
+    - the sender is a senior counterparty (exec, customer, partner)
     - the thread relates to an open item the user has with this person
 
-  Return null if:
+  LOW confidence (≤ 0.2) — skip; the brief should NOT surface:
     - automated notification, newsletter, marketing, calendar invite reply
     - generic FYI with no action required
     - the user is BCCd or one of many recipients with no direct ask
 
-  When returning a verdict, `reason` is one short sentence explaining
-  why — reference the sender context when it sharpens the judgment.
-  `confidence` is your calibrated estimate in [0,1]. `tier` defaults
-  to TIMELY; promote to URGENT only if there's a same-day deadline or
-  a named blocker.
+  MID confidence (0.3–0.5) — borderline; reserve for genuinely unclear
+  cases the next pass should re-evaluate.
+
+  `reason` is one short concrete sentence — what specifically demands
+  attention (or why you judged it doesn't). Never emit placeholder text
+  like "{reason}" or generic filler. `tier` defaults to TIMELY; promote
+  to URGENT only if there's a same-day deadline or a named blocker.
 
   Thread (subject, participants, recent message bodies):
-  {{emailThread}}
+  {{thread}}
 
 cost: 0.5
 value: 1.0

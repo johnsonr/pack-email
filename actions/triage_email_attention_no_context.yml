@@ -14,8 +14,14 @@ description: Judge whether an email thread warrants attention (without sender co
 inputTypeNames:
   - email.thread
 
-outputTypeName: AttentionVerdict
+outputTypeName: com.embabel.assistant.consequence.AttentionVerdict
 nullable: true
+
+# Don't even run on emails that the initial-triage GOAP action
+# (`triage.email_screening`) has dismissed. See the matching note
+# on `triage_email_attention.yml`.
+pre:
+  - "emailScreened:java.lang.Boolean"
 
 prompt: |
   You are filtering email for {{user}}'s morning brief. Decide whether
@@ -23,24 +29,37 @@ prompt: |
   hours. You don't have any researched context for the sender — judge
   from the thread alone.
 
-  Return a verdict if any of these hold:
+  {% if personality %}
+  Your voice / personality:
+  {{personality}}
+
+  When you write the `reason` field, write it IN THIS VOICE. The
+  judgment criteria stay the same; the voice changes how you say
+  things, not what you decide.
+  {% endif %}
+
+  ALWAYS return an AttentionVerdict — never return null, never omit fields.
+  The host filters verdicts with confidence below 0.35 server-side, so use
+  confidence as the skip signal.
+
+  HIGH confidence (≥ 0.6) — surface if ANY hold:
     - the user is being asked an explicit question or for a decision
     - there is a deadline mentioned within ~48 hours
     - the thread is a re-ply / escalation on a topic the user previously owned
     - the sender's email domain or signature suggests an exec, customer, or partner
 
-  Return null if:
+  LOW confidence (≤ 0.2) — skip; the brief should NOT surface:
     - automated notification, newsletter, marketing, calendar invite reply
     - generic FYI with no action required
     - the user is BCCd or one of many recipients with no direct ask
 
-  When returning a verdict, `reason` is one short sentence explaining
-  why. `confidence` is your calibrated estimate in [0,1]. `tier`
-  defaults to TIMELY; promote to URGENT only if there's a same-day
-  deadline or a named blocker.
+  `reason` is one short concrete sentence — what specifically demands
+  attention (or why not). Never emit placeholder text like "{reason}".
+  `tier` defaults to TIMELY; promote to URGENT only if there's a
+  same-day deadline or a named blocker.
 
   Thread (subject, participants, recent message bodies):
-  {{emailThread}}
+  {{thread}}
 
 cost: 0.5
 value: 0.8

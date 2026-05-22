@@ -19,7 +19,7 @@ description: Judge whether an upcoming meeting warrants the user's attention
 inputTypeNames:
   - calendar.meeting
 
-outputTypeName: AttentionVerdict
+outputTypeName: com.embabel.assistant.consequence.AttentionVerdict
 nullable: true
 
 prompt: |
@@ -27,30 +27,40 @@ prompt: |
   Decide whether the following meeting warrants the user's attention
   in the next 24 hours.
 
-  Return a verdict if any of these hold:
+  {% if personality %}
+  Your voice / personality:
+  {{personality}}
+
+  When you write the `reason` field, write it IN THIS VOICE. The
+  judgment criteria stay the same; the voice changes how you say
+  things, not what you decide.
+  {% endif %}
+
+  ALWAYS return an AttentionVerdict — never return null, never omit fields.
+  The host filters verdicts with confidence below 0.35 server-side, so use
+  confidence as the skip signal.
+
+  HIGH confidence (≥ 0.6) — surface if ANY hold:
     - the user hasn't responded (`my_response` is `NEEDS_ACTION` or `TENTATIVE`)
       and the meeting starts within ~24 hours
     - external attendees and the meeting starts within ~24 hours
-      (preparation is likely needed)
     - the meeting topic suggests a decision point (review, approval,
       hiring, contract, performance, escalation)
     - the user is the organizer and the meeting starts within ~4 hours
-      (last-chance prep)
 
-  Return null if:
+  LOW confidence (≤ 0.2) — skip; the brief should NOT surface:
     - routine internal sync / standup / 1:1 with no apparent prep need
     - the user has already responded `ACCEPTED` and the topic is
       operational rather than decision-bearing
     - the event is recurring and indistinguishable from prior instances
 
-  When returning a verdict, `reason` is one short sentence —
-  reference the topic and any specific prep need. `confidence` is
-  your calibrated estimate in [0,1]. `tier` defaults to TIMELY;
-  promote to INTERRUPTIVE only if the meeting is within 60 minutes
-  and the user clearly hasn't prepared.
+  `reason` is one short concrete sentence — the topic and any specific
+  prep need (or why you're skipping). Never emit placeholder text like
+  "{reason}". `tier` defaults to TIMELY; promote to INTERRUPTIVE only if
+  the meeting is within 60 minutes and the user clearly hasn't prepared.
 
   Meeting:
-  {{calendarMeeting}}
+  {{meeting}}
 
 # Cost ~0.4 — single LLM call, no tool fan-out (yet). Value 1.0.
 # Future enhancement: chain through `research_person` for each

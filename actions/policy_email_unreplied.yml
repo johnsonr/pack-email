@@ -22,3 +22,9 @@ whenExpr: "$self in participants and last_sender != $self and age >= 24h"
 # the LLM triage's 0.5 — the planner picks this first.
 cost: 0.01
 value: 1.0
+
+# Gate behind the initial-triage GOAP action — don't fire on spam or
+# calendar-artifact emails even though we'd be cheap; spam producing
+# an "unreplied!" card is exactly the noise we're fighting.
+pre:
+  - "emailScreened:java.lang.Boolean"
